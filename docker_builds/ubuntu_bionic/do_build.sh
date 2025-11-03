@@ -2,6 +2,9 @@
 set -e
 cd /root
 
+# Set default commit if not specified
+SDRPP_COMMIT="${SDRPP_COMMIT:-052167962dbf9adc2a02825f2f428e7613255d50}"
+
 # Update repos to get a more recent cmake version
 apt update
 apt install -y gpg wget
@@ -92,6 +95,15 @@ cmake ..
 make -j2
 make install
 cd ../../
+
+# Clone SDRPlusPlus if not already present (from mounted volume)
+if [ ! -d "SDRPlusPlus" ]; then
+    echo "Cloning SDRPlusPlus from GitHub..."
+    git clone https://github.com/AlexandreRouma/SDRPlusPlus
+    cd SDRPlusPlus
+    git checkout $SDRPP_COMMIT
+    cd ..
+fi
 
 # Build SDR++ Itself
 cd SDRPlusPlus
