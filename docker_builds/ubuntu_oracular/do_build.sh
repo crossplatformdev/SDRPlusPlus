@@ -2,7 +2,8 @@
 set -e
 cd /root
 
-# Set default commit if not specified
+# Set default repository and commit if not specified
+SDRPP_REPO="${SDRPP_REPO:-https://github.com/AlexandreRouma/SDRPlusPlus}"
 SDRPP_COMMIT="${SDRPP_COMMIT:-052167962dbf9adc2a02825f2f428e7613255d50}"
 
 # Install dependencies and tools
@@ -61,8 +62,8 @@ cd ../../
 
 # Clone SDRPlusPlus if not already present (from mounted volume)
 if [ ! -d "SDRPlusPlus" ]; then
-    echo "Cloning SDRPlusPlus from GitHub..."
-    git clone https://github.com/AlexandreRouma/SDRPlusPlus
+    echo "Cloning SDRPlusPlus from $SDRPP_REPO..."
+    git clone "$SDRPP_REPO" SDRPlusPlus
     cd SDRPlusPlus
     if ! git rev-parse --verify "$SDRPP_COMMIT" >/dev/null 2>&1; then
         echo "Error: Commit $SDRPP_COMMIT does not exist in the repository"

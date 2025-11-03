@@ -4,19 +4,27 @@ This directory contains Docker build configurations for building SDR++ on variou
 
 ## Building a Specific Commit
 
-All build scripts now support building from a specific commit of the SDRPlusPlus repository. This is controlled by the `SDRPP_COMMIT` environment variable.
+All build scripts now support building from a specific commit of the SDRPlusPlus repository. This is controlled by the `SDRPP_REPO` and `SDRPP_COMMIT` environment variables.
 
 ### Default Behavior
 
-By default, if the `SDRPlusPlus` directory is not present (not mounted from the host), the build scripts will clone the repository and checkout commit `052167962dbf9adc2a02825f2f428e7613255d50`.
+By default, if the `SDRPlusPlus` directory is not present (not mounted from the host), the build scripts will:
+- Clone from repository: `https://github.com/AlexandreRouma/SDRPlusPlus`
+- Checkout commit: `052167962dbf9adc2a02825f2f428e7613255d50`
 
-### Building with a Custom Commit
+### Building with a Custom Commit or Repository
 
-To build a different commit, set the `SDRPP_COMMIT` environment variable when running the Docker container:
+To build from a different repository or commit, set the environment variables when running the Docker container:
 
 ```bash
 # Example: Building Ubuntu Jammy with a specific commit
 docker run --name build \
+  --env SDRPP_COMMIT=<commit-sha> \
+  sdrpp_build /root/do_build.sh
+
+# Example: Building from a fork repository
+docker run --name build \
+  --env SDRPP_REPO=https://github.com/youruser/SDRPlusPlus \
   --env SDRPP_COMMIT=<commit-sha> \
   sdrpp_build /root/do_build.sh
 ```
