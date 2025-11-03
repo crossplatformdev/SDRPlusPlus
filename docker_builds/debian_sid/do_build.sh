@@ -64,6 +64,10 @@ if [ ! -d "SDRPlusPlus" ]; then
     echo "Cloning SDRPlusPlus from GitHub..."
     git clone https://github.com/AlexandreRouma/SDRPlusPlus
     cd SDRPlusPlus
+    if ! git rev-parse --verify "$SDRPP_COMMIT" >/dev/null 2>&1; then
+        echo "Error: Commit $SDRPP_COMMIT does not exist in the repository"
+        exit 1
+    fi
     git checkout "$SDRPP_COMMIT"
     cd ..
 fi
