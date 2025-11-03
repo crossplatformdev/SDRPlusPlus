@@ -1,0 +1,76 @@
+name: Create Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release version tag (e.g., v1.2.1)'
+        required: true
+        type: string
+        default: 'v1.2.1'
+      prerelease:
+        description: 'Mark as pre-release'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  create_release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Determine tag name
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "name=${{ inputs.tag_name }}" >> $GITHUB_OUTPUT
+            echo "is_prerelease=${{ inputs.prerelease }}" >> $GITHUB_OUTPUT
+          else
+            echo "name=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+            # Check if tag contains alpha, beta, rc, or preview
+            if [[ "${GITHUB_REF#refs/tags/}" =~ (alpha|beta|rc|preview) ]]; then
+              echo "is_prerelease=true" >> $GITHUB_OUTPUT
+            else
+              echo "is_prerelease=false" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+      - name: Create or update tag (workflow_dispatch only)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -fa ${{ steps.tag.outputs.name }} -m "Release ${{ steps.tag.outputs.name }}"
+          git push origin ${{ steps.tag.outputs.name }} --force
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.tag.outputs.name }}
+          name: Release ${{ steps.tag.outputs.name }}
+          draft: false
+          prerelease: ${{ steps.tag.outputs.is_prerelease }}
+          generate_release_notes: true
+          body: |
+            ## SDR++ Release ${{ steps.tag.outputs.name }}
+
+            This release is built from commit ${{ github.sha }}.
+
+            ### Installation
+
+            Download the appropriate package for your platform from the assets below.
+
+            For build artifacts (binaries), please check the [Build Binaries workflow runs](https://github.com/${{ github.repository }}/actions/workflows/build_all.yml) and download the artifacts from the corresponding run.
+
+            ### Changes
+
+            See the automatically generated release notes below for details.
