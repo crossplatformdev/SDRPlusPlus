@@ -639,17 +639,34 @@ jobs:
         - name: Download All Builds
           uses: actions/download-artifact@v4
 
+        - name: Checkout code
+          uses: actions/checkout@v4
+
+        - name: Read version from source
+          id: read_version
+          run: |
+            VERSION=$(grep "#define VERSION_STR" core/src/version.h | cut -d'"' -f2)
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+
         - name: Determine Release Tag
           id: release_tag
           run: |
             if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
               if [ -n "${{ inputs.release_tag }}" ]; then
-                echo "tag=${{ inputs.release_tag }}" >> $GITHUB_OUTPUT
+                TAG="${{ inputs.release_tag }}"
               else
-                echo "tag=v1.2.1" >> $GITHUB_OUTPUT
+                TAG="v${{ steps.read_version.outputs.version }}"
               fi
             else
-              echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+              TAG="${GITHUB_REF#refs/tags/}"
+            fi
+            echo "tag=$TAG" >> $GITHUB_OUTPUT
+            
+            # Detect if this is a pre-release
+            if [[ "$TAG" =~ (alpha|beta|rc|preview) ]]; then
+              echo "is_prerelease=true" >> $GITHUB_OUTPUT
+            else
+              echo "is_prerelease=false" >> $GITHUB_OUTPUT
             fi
 
         - name: Create Release
@@ -657,7 +674,7 @@ jobs:
           with:
             files: sdrpp_all/*
             draft: false
-            prerelease: false
+            prerelease: ${{ steps.release_tag.outputs.is_prerelease }}
             generate_release_notes: true
             tag_name: ${{ steps.release_tag.outputs.tag }}
 

@@ -7,10 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: 'Release version tag (e.g., v1.2.1)'
-        required: true
+        description: 'Release version tag (leave empty to use version from code)'
+        required: false
         type: string
-        default: 'v1.2.1'
       prerelease:
         description: 'Mark as pre-release'
         required: false
@@ -28,29 +27,53 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Read version from source
+        id: read_version
+        run: |
+          VERSION=$(grep "#define VERSION_STR" core/src/version.h | cut -d'"' -f2)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
       - name: Determine tag name
         id: tag
         run: |
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            echo "name=${{ inputs.tag_name }}" >> $GITHUB_OUTPUT
+            if [ -n "${{ inputs.tag_name }}" ]; then
+              TAG="${{ inputs.tag_name }}"
+            else
+              TAG="v${{ steps.read_version.outputs.version }}"
+            fi
+            echo "name=$TAG" >> $GITHUB_OUTPUT
+            # Use input prerelease value for manual triggers
             echo "is_prerelease=${{ inputs.prerelease }}" >> $GITHUB_OUTPUT
           else
-            echo "name=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+            TAG="${GITHUB_REF#refs/tags/}"
+            echo "name=$TAG" >> $GITHUB_OUTPUT
             # Check if tag contains alpha, beta, rc, or preview
-            if [[ "${GITHUB_REF#refs/tags/}" =~ (alpha|beta|rc|preview) ]]; then
+            if [[ "$TAG" =~ (alpha|beta|rc|preview) ]]; then
               echo "is_prerelease=true" >> $GITHUB_OUTPUT
             else
               echo "is_prerelease=false" >> $GITHUB_OUTPUT
             fi
           fi
 
-      - name: Create or update tag (workflow_dispatch only)
+      - name: Check if tag exists (workflow_dispatch only)
         if: github.event_name == 'workflow_dispatch'
+        id: check_tag
+        run: |
+          if git ls-remote --tags origin | grep -q "refs/tags/${{ steps.tag.outputs.name }}$"; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "::warning::Tag ${{ steps.tag.outputs.name }} already exists. It will not be overwritten."
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create tag (workflow_dispatch only, if tag doesn't exist)
+        if: github.event_name == 'workflow_dispatch' && steps.check_tag.outputs.exists == 'false'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -fa ${{ steps.tag.outputs.name }} -m "Release ${{ steps.tag.outputs.name }}"
-          git push origin ${{ steps.tag.outputs.name }} --force
+          git tag -a ${{ steps.tag.outputs.name }} -m "Release ${{ steps.tag.outputs.name }}"
+          git push origin ${{ steps.tag.outputs.name }}
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
