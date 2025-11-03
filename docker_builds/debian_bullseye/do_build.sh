@@ -64,7 +64,7 @@ if [ ! -d "SDRPlusPlus" ]; then
     echo "Cloning SDRPlusPlus from GitHub..."
     git clone https://github.com/AlexandreRouma/SDRPlusPlus
     cd SDRPlusPlus
-    git checkout $SDRPP_COMMIT
+    git checkout "$SDRPP_COMMIT"
     cd ..
 fi
 
