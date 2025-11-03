@@ -1,0 +1,99 @@
+name: Create Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release version tag (leave empty to use version from code)'
+        required: false
+        type: string
+      prerelease:
+        description: 'Mark as pre-release'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  create_release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Read version from source
+        id: read_version
+        run: |
+          VERSION=$(grep "#define VERSION_STR" core/src/version.h | cut -d'"' -f2)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Determine tag name
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            if [ -n "${{ inputs.tag_name }}" ]; then
+              TAG="${{ inputs.tag_name }}"
+            else
+              TAG="v${{ steps.read_version.outputs.version }}"
+            fi
+            echo "name=$TAG" >> $GITHUB_OUTPUT
+            # Use input prerelease value for manual triggers
+            echo "is_prerelease=${{ inputs.prerelease }}" >> $GITHUB_OUTPUT
+          else
+            TAG="${GITHUB_REF#refs/tags/}"
+            echo "name=$TAG" >> $GITHUB_OUTPUT
+            # Check if tag contains alpha, beta, rc, or preview
+            if [[ "$TAG" =~ (alpha|beta|rc|preview) ]]; then
+              echo "is_prerelease=true" >> $GITHUB_OUTPUT
+            else
+              echo "is_prerelease=false" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+      - name: Check if tag exists (workflow_dispatch only)
+        if: github.event_name == 'workflow_dispatch'
+        id: check_tag
+        run: |
+          if git ls-remote --tags origin | grep -q "refs/tags/${{ steps.tag.outputs.name }}$"; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "::warning::Tag ${{ steps.tag.outputs.name }} already exists. It will not be overwritten."
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create tag (workflow_dispatch only, if tag doesn't exist)
+        if: github.event_name == 'workflow_dispatch' && steps.check_tag.outputs.exists == 'false'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a ${{ steps.tag.outputs.name }} -m "Release ${{ steps.tag.outputs.name }}"
+          git push origin ${{ steps.tag.outputs.name }}
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.tag.outputs.name }}
+          name: Release ${{ steps.tag.outputs.name }}
+          draft: false
+          prerelease: ${{ steps.tag.outputs.is_prerelease }}
+          generate_release_notes: true
+          body: |
+            ## SDR++ Release ${{ steps.tag.outputs.name }}
+
+            This release is built from commit ${{ github.sha }}.
+
+            ### Installation
+
+            Download the appropriate package for your platform from the assets below.
+
+            For build artifacts (binaries), please check the [Build Binaries workflow runs](https://github.com/${{ github.repository }}/actions/workflows/build_all.yml) and download the artifacts from the corresponding run.
+
+            ### Changes
+
+            See the automatically generated release notes below for details.
