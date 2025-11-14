@@ -19,6 +19,8 @@ jobs:
 
         steps:
         - uses: actions/checkout@v4
+
+        - name:
           run: git checkout nightly
         
         - name: Create Build Environment
